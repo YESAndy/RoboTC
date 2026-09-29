@@ -1,0 +1,63 @@
+{
+  "preset": "standard",
+  "room": {
+    "width_m": 8.0,
+    "depth_m": 6.0,
+    "height_m": 2.8
+  },
+  "robot": {
+    "length_m": 0.55,
+    "width_m": 0.45,
+    "height_m": 1.4,
+    "start_pose": [-2.8, -1.6, 0.0],
+    "speed_m_s": 0.6,
+    "yaw_speed_rad_s": 1.0
+  },
+  "thermal": {
+    "mount_m": [0.16, 0.0, 1.25],
+    "yaw_deg": 0.0,
+    "pitch_deg": -8.0,
+    "hfov_deg": 70.0,
+    "near_m": 0.1,
+    "far_m": 10.0,
+    "noise_std_c": 0.0,
+    "display_min_c": 18.0,
+    "display_max_c": 60.0
+  },
+  "presets": {
+    "standard": {
+      "thermal_size": [160, 120],
+      "sensor_hz": 5.0,
+      "depth_size": [320, 240]
+    },
+    "low_power": {
+      "thermal_size": [80, 60],
+      "sensor_hz": 2.0,
+      "depth_size": [160, 120]
+    }
+  },
+  "temperatures_c": {
+    "room": 22.0,
+    "skin": 33.0,
+    "clothing": 28.0,
+    "laptop": 42.0,
+    "monitor": 32.0,
+    "coffee": 58.0,
+    "window": 19.0
+  },
+  "seed": 7,
+  "depth": {
+    "mount_m": [0.15, 0.0, 1.35],
+    "yaw_deg": 0.0,
+    "pitch_deg": -8.0,
+    "hfov_deg": 70.0,
+    "near_m": 0.2,
+    "far_m": 10.0
+  },
+  "planner": {
+    "resolution_m": 0.1,
+    "occupancy_threshold": 0.5,
+    "standoff_m": 1.0,
+    "dwell_s": 2.0
+  }
+}

@@ -1,0 +1,29 @@
+# RoboTC web validation
+
+Validated on the target Apple M2 Pro Mac on 2026-09-29.
+
+## Automated checks
+
+- 13 passing unit tests cover manual motion, speed limits, collision prevention, repeated human visits, dwell and pause, moved-person replanning, full reset, no-human/no-path cases, unreachable-person fallback, occupancy-safe segments, NPY encoding, triangle budget, and camera calibration.
+- GPU checks verify 2.5 m and 4.5 m forward-axis depth, 42°C/80°C visible temperatures, occlusion, invalid masks/NaNs, rotated cameras, clipping, pixel orientation, and calibration.
+- Scene checks complete person 1 → person 2 → person 1 → person 2, and reset both person roots and edited body parts.
+- TypeScript and production build pass. Dependency audit reports no known vulnerabilities after patch updates.
+
+## Browser measurements
+
+Measured in the Chromium 154 in-app browser on the target Mac:
+
+| Preset | Wall time | Captures | Rate | Human visits | Blocked routes |
+|---|---:|---:|---:|---:|---:|
+| Standard | 600.001 s | 2,988 | 4.980 Hz | 64 | 0 |
+| Low power | 60.984 s | 122 | 2.001 Hz | 6 | 0 |
+
+The standard run advanced 596.0 simulated seconds; missed simulation time is capped to preserve responsiveness. Both runs continuously alternated people without manual resets between visits. Geometry stayed at 126 GPU geometries and two render textures (6,016 triangles in the sampled render pass).
+
+Observed JavaScript heap: standard start 38.33 MB, end 22.82 MB, sampled peak 44.26 MB; low-power start 22.82 MB, end 21.10 MB, peak 29.86 MB. These are browser-reported heap measurements, not total browser or GPU memory. They show no sustained growth over this test. Standard mean capture duration over the retained last 600 captures was 5.94 ms. The low-power capture-duration window included samples from the preceding run and is not reported as a standalone latency result.
+
+The recorded benchmark predates a dependency patch update, optional browser-agent tools, additional raycast tests, and a keyboard-modifier guard; motion, office geometry and sensor shaders are unchanged.
+
+## Reproduce
+
+Run `npm test` and `npm run build`. Start `npm run preview`, then open `/?test=1` for GPU checks or `/?test=1&benchmark=600` for the standard ten-minute tour followed by a one-minute low-power run. Keep the browser tab visible and the driving area focused. The benchmark report is downloadable from the page when complete.
