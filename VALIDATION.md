@@ -9,6 +9,11 @@ Validated on the target Apple M2 Pro Mac on 2026-09-29.
 - Scene checks complete person 1 → person 2 → person 1 → person 2, and reset both person roots and edited body parts.
 - TypeScript and production build pass. Dependency audit reports no known vulnerabilities after patch updates.
 
+## Final-build checks
+
+- Independent CPU raycasts agree with GPU observations: depth maximum sampled error 0.0001441 m (129 valid samples), thermal error 0°C (139 valid samples), no validity mismatches.
+- Browser controls checked: Approach starts the route, W takes manual control and clears the target, Space stops, switching focus to the preset control pauses, low-power resolution switches to 160×120 depth and 80×60 thermal.
+
 ## Browser measurements
 
 Measured in the Chromium 154 in-app browser on the target Mac:
