@@ -1,4 +1,5 @@
-import {registerTools} from "./webmcp";
+import { ACTIVITY_LABELS } from "./activities";
+import { registerTools } from "./webmcp";
 import * as T from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { Simulation, type Config, type Pose } from "./core";
@@ -14,7 +15,7 @@ $("app").innerHTML =
 <main><div class="heading"><div><div class="eyebrow">HUMAN-AWARE NAVIGATION</div><h1>A room to explore.</h1></div><div class="preset"><label for="preset">POWER MODE</label><select id="preset"><option value="standard">Standard · 5 Hz</option><option value="low_power">Low power · 2 Hz</option></select></div></div>
 <div class="workspace"><section class="overview panel"><div class="panel-heading"><h2><span class="marker"></span>Office overview</h2><span>8 × 6 m</span></div><div id="viewport" tabindex="0" aria-label="Robot driving area. W S forward back, A D sideways, Q E rotate, Space stop."><div id="loading">Preparing the office…</div><div class="view-label">LIVE ENVIRONMENT <span>Drag to orbit · Scroll to zoom</span></div><div class="pose" id="pose">x −2.80 · y −1.60 · yaw 0°</div></div><div class="toolbar"><div><button id="start">▶ Start</button><button id="pause">Ⅱ Pause</button><button id="reset">↺ Reset</button></div><button id="approach" class="primary">Approach people <span>↗</span></button></div></section>
 <aside class="sensors"><section class="panel sensor"><div class="panel-heading"><h2><span class="marker depth"></span>Depth</h2><span id="depth-size">320 × 240</span></div><div class="sensor-image"><canvas id="depth" aria-label="Depth observation"></canvas><span class="sensor-badge">METERS</span></div><div class="scale depth-scale"></div><div class="scale-label"><span>0.2 m</span><span>10 m</span></div></section><section class="panel sensor"><div class="panel-heading"><h2><span class="marker thermal"></span>Thermal</h2><span id="thermal-size">160 × 120</span></div><div class="sensor-image"><canvas id="thermal" aria-label="Thermal observation"></canvas><span class="sensor-badge">CELSIUS</span></div><div class="scale thermal-scale"></div><div class="scale-label"><span>18°C</span><span>60°C</span></div></section></aside></div>
-<div class="bottom"><section class="mission panel"><div><span class="eyebrow">CURRENT TASK</span><h3 id="status" role="status">Ready to explore</h3><p id="detail">Drive the cart, or let it approach each person in turn.</p></div><div class="metrics"><div><span>TARGET</span><strong id="target">—</strong></div><div><span>VISITS</span><strong id="visits">0</strong></div><div><span>SENSOR RATE</span><strong id="rate">—</strong></div></div><button id="snapshot" class="snapshot">↓ Save snapshot</button></section><section class="keys"><span class="eyebrow">MANUAL CONTROLS</span><div><kbd>W</kbd><kbd>S</kbd> Drive <kbd>A</kbd><kbd>D</kbd> Strafe <kbd>Q</kbd><kbd>E</kbd> Turn <kbd>Space</kbd> Stop</div><p>Click the office to drive. Leaving the driving area pauses motion.</p></section></div><footer><span><i></i> Oracle human detection · Ideal depth · Assigned surface temperatures</span><span>Runs on your device. Snapshots download only when requested.</span></footer><div id="error" role="alert" hidden></div></main>`;
+<div class="bottom"><section class="mission panel"><div><span class="eyebrow">CURRENT TASK</span><h3 id="status" role="status">Ready to explore</h3><p id="detail">Drive the cart, or let it approach each person in turn.</p></div><div class="metrics"><div><span>TARGET</span><strong id="target">—</strong></div><div><span>VISITS</span><strong id="visits">0</strong></div><div><span>SENSOR RATE</span><strong id="rate">—</strong></div></div><button id="snapshot" class="snapshot">↓ Save snapshot</button></section><section class="keys"><span class="eyebrow">MANUAL CONTROLS</span><div><kbd>W</kbd><kbd>S</kbd> Drive <kbd>A</kbd><kbd>D</kbd> Strafe <kbd>Q</kbd><kbd>E</kbd> Turn <kbd>Space</kbd> Stop</div><p>Click the office to drive. Leaving the driving area pauses motion.</p></section></div><div id="activities" class="activity-list" aria-label="Human activities"></div><footer><span><i></i> Oracle human detection · Ideal depth · Assigned surface temperatures</span><span>Runs on your device. Snapshots download only when requested.</span></footer><div id="error" role="alert" hidden></div></main>`;
 async function boot() {
   const params = new URLSearchParams(location.search),
     benchmarkSeconds = Number(params.get("benchmark") || 0),
@@ -74,6 +75,7 @@ async function boot() {
       units: { depth: "meters (camera-forward Z)", thermal: "degrees Celsius" },
       calibration: cal,
       oracle_humans: structuredClone(sim.humans),
+      activity_seed: sim.activitySeed,
       task: structuredClone(sim.planner.info()),
       tour: structuredClone(sim.tour),
       configuration: structuredClone(config),
@@ -108,9 +110,9 @@ async function boot() {
     accumulator = 0;
     updateUI();
   }
-  function reset() {
+  function reset(seed?: number) {
     pause();
-    sim.reset();
+    sim.reset(seed);
     office.resetPeople();
     office.sync(sim.pose, sim.humans);
     office.setRoute([]);
@@ -154,6 +156,13 @@ async function boot() {
       status = "Movement blocked";
       detail = `Stopped near ${sim.blocked}. Choose another direction.`;
     }
+    $("activities").textContent =
+      sim.humans
+        .map(
+          (h) =>
+            `${h.id.replace("person", "Person")}: ${ACTIVITY_LABELS[h.activity ?? "standing"]}`,
+        )
+        .join("  ·  ") + " — Reset to assign new activities";
     $("status").textContent = status;
     $("detail").textContent = detail;
     $("target").textContent =
@@ -161,7 +170,7 @@ async function boot() {
     $("visits").textContent = String(sim.tour.completed_visits);
     const span = (captureTimes.at(-1)! - captureTimes[0]) / 1000;
     $("rate").textContent =
-      captureTimes.length > 1
+      captureTimes.length > 1 && span >= 1
         ? ((captureTimes.length - 1) / span).toFixed(1) + " Hz"
         : "—";
     $("clock").textContent =
@@ -180,7 +189,7 @@ async function boot() {
     updateUI();
   };
   $("pause").onclick = pause;
-  $("reset").onclick = reset;
+  $("reset").onclick = () => reset();
   $("approach").onclick = () => {
     keys.clear();
     sim.approach();
@@ -332,7 +341,9 @@ async function boot() {
     snapshot: saveSnapshot,
   };
   (window as unknown as { robotc: typeof api }).robotc = api;
-  registerTools(api).catch(error=>console.warn("Optional browser tools unavailable",error));
+  registerTools(api).catch((error) =>
+    console.warn("Optional browser tools unavailable", error),
+  );
   if (testing) {
     const report = {
       browser: navigator.userAgent,
@@ -433,6 +444,10 @@ async function boot() {
         }
       }, 1000);
     }
+  }
+  if (!testing) {
+    sim.reset();
+    office.resetPeople();
   }
   $("loading").remove();
   office.sync(sim.pose, sim.humans);

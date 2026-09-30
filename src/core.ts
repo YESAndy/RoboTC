@@ -1,7 +1,22 @@
+import {
+  assignActivities,
+  advanceActivities,
+  humanBounds,
+  type Activity,
+} from "./activities";
 export type XY = [number, number];
 export type Pose = [number, number, number];
 export type Obstacle = [number, number, number, number, string];
-export type Human = { id: string; position: XY };
+export type Human = {
+  id: string;
+  position: XY;
+  activity?: Activity;
+  yaw?: number;
+  activityTime?: number;
+  walking?: boolean;
+  walkRoute?: XY[];
+  walkTarget?: number;
+};
 export type CameraSpec = {
   mount_m: number[];
   yaw_deg: number;
@@ -176,15 +191,62 @@ export class OccupancyMap {
     return Math.max(this.free(this.cell(p)) ? 0 : 1, this.geometry(p));
   }
   segmentFree(a: number[], b: number[]) {
-    const n = Math.max(1, Math.ceil(dist(a, b) / (this.resolution / 3)));
-    for (let i = 0; i <= n; i++)
-      if (
-        this.occupancy([
-          a[0] + ((b[0] - a[0]) * i) / n,
-          a[1] + ((b[1] - a[1]) * i) / n,
-        ]) > this.threshold
+    if (
+      this.occupancy(a) > this.threshold ||
+      this.occupancy(b) > this.threshold
+    )
+      return false;
+    // Exact slab intersections catch even tiny clips of occupied cell corners.
+    const crosses = (
+      xmin: number,
+      ymin: number,
+      xmax: number,
+      ymax: number,
+    ) => {
+      let lo = 0,
+        hi = 1;
+      for (const [axis, min, max] of [
+        [0, xmin, xmax],
+        [1, ymin, ymax],
+      ]) {
+        const delta = b[axis] - a[axis];
+        if (Math.abs(delta) < 1e-12) {
+          if (a[axis] < min || a[axis] > max) return false;
+        } else {
+          const u = (min - a[axis]) / delta,
+            v = (max - a[axis]) / delta;
+          lo = Math.max(lo, Math.min(u, v));
+          hi = Math.min(hi, Math.max(u, v));
+          if (lo > hi) return false;
+        }
+      }
+      return true;
+    };
+    const ca = this.cell(a),
+      cb = this.cell(b),
+      r = this.resolution;
+    for (
+      let y = Math.max(0, Math.min(ca[1], cb[1]) - 1);
+      y <= Math.min(this.ny - 1, Math.max(ca[1], cb[1]) + 1);
+      y++
+    )
+      for (
+        let x = Math.max(0, Math.min(ca[0], cb[0]) - 1);
+        x <= Math.min(this.nx - 1, Math.max(ca[0], cb[0]) + 1);
+        x++
+      ) {
+        if (this.free([x, y])) continue;
+        const px = -this.config.room.width_m / 2 + x * r,
+          py = -this.config.room.depth_m / 2 + y * r;
+        if (crosses(px, py, px + r, py + r)) return false;
+      }
+    const d = this.inflation;
+    if (
+      this.obstacles.some((o) =>
+        crosses(o[0] - d, o[1] - d, o[2] + d, o[3] + d),
       )
-        return false;
+    )
+      return false;
     return true;
   }
   search(start: number[], candidates: XY[]): XY[] | null {
@@ -370,6 +432,7 @@ export class Simulation {
   };
   revision = 0;
   signature = "";
+  activitySeed: number | null = null;
   constructor(
     public config: Config,
     obstacles: Obstacle[],
@@ -388,16 +451,7 @@ export class Simulation {
       0,
       this.obstacles.length,
       ...this.staticObstacles,
-      ...this.humans.map(
-        (h) =>
-          [
-            h.position[0] - 0.4,
-            h.position[1] - 0.25,
-            h.position[0] + 0.4,
-            h.position[1] + 0.25,
-            h.id,
-          ] as Obstacle,
-      ),
+      ...this.humans.map(humanBounds),
     );
   }
   clearTour() {
@@ -414,9 +468,10 @@ export class Simulation {
     this.planner.reset();
     this.revision++;
   }
-  reset() {
+  reset(seed = Math.floor(Math.random() * 0x100000000)) {
+    this.activitySeed = seed >>> 0;
     this.pose = [...this.config.robot.start_pose] as Pose;
-    this.humans = structuredClone(this.initialHumans);
+    this.humans = assignActivities(this.initialHumans, this.activitySeed);
     this.syncHumans();
     this.time = 0;
     this.running = false;
@@ -434,10 +489,24 @@ export class Simulation {
     const h = this.humans.find((h) => h.id === id);
     if (!h) throw Error("Unknown human: " + id);
     h.position = [x, y];
+    // Explicit placement becomes a stationary override until the next reset.
+    h.activity = "standing";
+    h.walkRoute = undefined;
+    h.walking = false;
+    h.yaw = 0;
     this.syncHumans();
   }
   humanSignature() {
-    return JSON.stringify(this.humans.map((h) => [h.id, ...h.position]).sort());
+    return JSON.stringify(
+      this.humans
+        .map((h) => [
+          h.id,
+          ...h.position.map((v) =>
+            h.activity === "walking" ? Math.round(v / 0.1) : v,
+          ),
+        ])
+        .sort(),
+    );
   }
   next() {
     this.signature = this.humanSignature();
@@ -474,8 +543,22 @@ export class Simulation {
     const zero: Pose = [0, 0, 0];
     if (!this.active()) return zero;
     if (this.signature !== this.humanSignature()) {
-      this.tour.dwell_remaining_s = 0;
-      this.next();
+      if (
+        this.tour.status === "DWELLING" &&
+        this.humans.some(
+          (h) =>
+            h.id === this.planner.target?.id &&
+            Math.hypot(
+              h.position[0] - this.planner.target.position[0],
+              h.position[1] - this.planner.target.position[1],
+            ) < 0.25,
+        )
+      ) {
+        this.signature = this.humanSignature();
+        this.planner.map.rebuild();
+      } else {
+        this.next();
+      }
     }
     if (this.tour.status === "DWELLING") {
       if (this.planner.map.occupancy(this.pose) > this.planner.map.threshold) {
@@ -490,7 +573,17 @@ export class Simulation {
       return zero;
     }
     if (this.tour.status !== "EXECUTING") return zero;
-    const c = this.planner.command(this.pose, dt);
+    let c = this.planner.command(this.pose, dt);
+    // A moving person can invalidate a previously clear endpoint before the
+    // next quantized oracle update. Replan while the current pose is safe.
+    if (
+      this.planner.status === "COLLISION" &&
+      this.humans.some((h) => h.activity === "walking") &&
+      this.planner.map.geometry(this.pose) <= this.planner.map.threshold
+    ) {
+      this.next();
+      c = this.planner.command(this.pose, dt);
+    }
     if (this.planner.status === "SUCCESS") {
       const id = this.planner.target!.id;
       this.tour.visited_this_round.push(id);
@@ -556,6 +649,8 @@ export class Simulation {
       }
       this.pose = p;
     }
+    advanceActivities(this.humans, this.staticObstacles, this.pose, dt);
+    this.syncHumans();
     this.time += dt;
     return this.blocked === null;
   }

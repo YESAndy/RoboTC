@@ -140,18 +140,20 @@ export function sceneChecks(config: Config) {
       JSON.stringify(["person 1", "person 2", "person 1", "person 2"]),
     actual: s.tour.recent_visit_order,
   };
-  s.setHumanPosition("person 1", -2.2, -0.3);
+  s.reset(7);
+  o.resetPeople();
   o.sync(s.pose, s.humans);
-  const part = o.people.get("person 1")!.children[0];
-  part.position.z += 0.3;
-  s.reset();
+  const expected = o.rigs.get("person 1")!.hips.position.clone();
+  s.setHumanPosition("person 1", -2.2, -0.3);
+  o.rigs.get("person 1")!.hips.position.z += 0.3;
+  s.reset(7);
   o.resetPeople();
   o.sync(s.pose, s.humans);
   const reset = {
-    name: "reset restores human roots, body parts and history",
+    name: "reset assigns reproducible activities and clears edited poses/history",
     passed:
-      o.people.get("person 1")!.position.x === -0.05 &&
-      Math.abs(part.position.z - 0.055) < 1e-8 &&
+      o.people.get("person 1")!.position.x === s.humans[0].position[0] &&
+      o.rigs.get("person 1")!.hips.position.distanceTo(expected) < 1e-8 &&
       s.tour.completed_visits === 0,
   };
   o.meshes.forEach((m) => m.geometry.dispose());
@@ -194,7 +196,17 @@ export function officeRayChecks(renderer: T.WebGLRenderer, config: Config) {
           ray.near = spec.near_m / cos;
           ray.far = spec.far_m / cos;
           ray.set(camera.position, v.applyQuaternion(camera.quaternion));
-          const hit = ray.intersectObjects(office.meshes, false)[0],
+          const hit = ray.intersectObjects(
+              office.meshes.filter((mesh) => {
+                let o: T.Object3D | null = mesh;
+                while (o) {
+                  if (!o.visible) return false;
+                  o = o.parent;
+                }
+                return true;
+              }),
+              false,
+            )[0],
             index = y * size[0] + x;
           if (Boolean(hit) !== Boolean(result.frame.valid[index])) {
             validMismatch++;

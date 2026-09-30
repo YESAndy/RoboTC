@@ -548,3 +548,10 @@ footer i {
     height: 42px;
   }
 }
+
+.activity-list {
+  padding: 0 0 16px;
+  font-size: 11px;
+  color: #526e64;
+  line-height: 1.8;
+}

@@ -21,11 +21,11 @@ Open the local address printed by Vite. No Blender, server backend, account, cam
 - **W/S:** forward/back. **A/D:** strafe. **Q/E:** turn. **Space:** stop.
 - **Pause:** stop. Leaving the driving area, switching windows, or hiding the tab also pauses and releases all keys.
 - **Approach people:** visit the nearest reachable unvisited person, stop approximately one meter away, face them, dwell two seconds, then visit the next person. Repeat after everyone has been visited.
-- **Reset:** restore the robot and every person's original position, orientation, and body parts; clear time, path, and visit history; pause.
+- **Reset:** restore the robot, randomly assign each person an activity and its starting position, clear time, path, and visit history, and pause.
 - **Save snapshot:** download a ZIP of synchronized observations and metadata.
 - Drag the office to orbit; scroll to zoom. The colored overview is a visualization, not an RGB sensor.
 
-Starting manual driving clears the current approach task. Clicking Approach starts a fresh tour. A blocked route or unreachable remaining people stops the robot, with a visible reason. People are stationary unless repositioned through the API. There are no wheel dynamics or rigid-body physics.
+Starting manual driving clears the current approach task. Clicking Approach starts a fresh tour. A blocked route or unreachable remaining people stops the robot, with a visible reason. Each reset independently assigns seating, standing, reading, typing, reclining, or walking; repeats are allowed. Seated activities use the two office chairs. Reading includes a book, typing includes a warm laptop and hand animation, and reclining tilts the chair back. Walkers follow short clear lanes at 0.22 m/s and yield within 1.5 m of the robot. Pause freezes activity animation and walking. There are no wheel dynamics or rigid-body physics.
 
 ## Configuration and sensors
 
@@ -40,14 +40,15 @@ Motion uses fixed 30 Hz steps. GPU geometry passes produce forward-axis depth in
 
 Thermal values do not model heat transfer, reflections, or calibrated radiometry. Ideal depth has no stereo artifacts. Thermal noise must remain zero in this version. Standard temperatures include room 22°C, skin 33°C, clothing 28°C, laptops 42°C, and coffee 58°C.
 
-The planner uses global scene oracle positions, independent of camera visibility. It constructs an inflated 0.1 m occupancy grid, uses eight-connected A* without diagonal corner cutting, prunes only clear segments, and checks the physical footprint during every movement substep. Candidate goals lie on a 1 m ring around each person. Nearest unreachable people are skipped in favor of a reachable unvisited person; if none remain reachable, the robot stops. Changed human positions trigger replanning on the next tick.
+The planner uses global scene oracle positions, independent of camera visibility. It constructs an inflated 0.1 m occupancy grid, uses eight-connected A* without diagonal corner cutting, prunes only clear segments, and checks the physical footprint during every movement substep. Candidate goals lie on a 1 m ring around each person. Nearest unreachable people are skipped in favor of a reachable unvisited person; if none remain reachable, the robot stops. Explicit human-position changes trigger replanning on the next tick. Walking positions trigger replanning at approximately 0.1 m intervals, with clearance checked every movement step.
 
 ## Browser API
 
 The same engine used by the interface is available as `window.robotc`:
 
 ```js
-robotc.reset();
+robotc.reset(); // fresh random activities
+robotc.reset(9); // optional seed for reproducible activities
 robotc.step(0.2, 0, 0, 0.1); // vx, vy (m/s), yaw rate (rad/s), dt (0–1 s)
 robotc.approach();
 robotc.pause();
@@ -57,7 +58,9 @@ const state = robotc.state;          // robot, humans, task, tour
 const metrics = robotc.metrics;
 ```
 
-`observe()` returns `depth` and `thermal` frames containing width, height, Float32Array values, Uint8Array validity, and RGBA preview bytes, plus metadata. Snapshots contain `depth_m.npy`, `depth_valid.npy`, `thermal_c.npy`, `thermal_valid.npy`, two preview PNGs, and `metadata.json`. Metadata includes common simulation time, capture date, robot pose, units, calibration K and T_world_camera, oracle humans, task/tour state, and configuration. Camera coordinates are right/down/forward. No frames are uploaded or automatically recorded.
+`setHumanPosition()` makes that person standing until the next reset.
+
+`observe()` returns `depth` and `thermal` frames containing width, height, Float32Array values, Uint8Array validity, and RGBA preview bytes, plus metadata. Snapshots contain `depth_m.npy`, `depth_valid.npy`, `thermal_c.npy`, `thermal_valid.npy`, two preview PNGs, and `metadata.json`. Metadata includes common simulation time, capture date, robot pose, units, calibration K and T_world_camera, oracle humans with activities, animation clocks and walking routes, activity seed, task/tour state, and configuration. Camera coordinates are right/down/forward. No frames are uploaded or automatically recorded.
 
 ## Verify
 

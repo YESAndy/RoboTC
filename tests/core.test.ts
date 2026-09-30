@@ -97,7 +97,12 @@ test("reset restores people, robot, time and history; manual takeover clears tou
   assert.equal(s.tour.enabled, false);
   assert.equal(s.planner.path.length, 0);
   s.reset();
-  assert.deepEqual(s.humans, s.initialHumans);
+  assert.deepEqual(
+    s.humans.map((h) => h.id),
+    s.initialHumans.map((h) => h.id),
+  );
+  assert(s.humans.every((h) => h.activity && h.activityTime === 0));
+  assert.notDeepEqual(s.humans[0].position, [-2.2, -0.3]);
   assert.deepEqual(s.pose, s.config.robot.start_pose);
   assert.equal(s.time, 0);
   assert.equal(s.running, false);

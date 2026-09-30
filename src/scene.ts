@@ -1,9 +1,25 @@
 import * as T from "three";
 import type { Config, Human, Obstacle, Pose } from "./core";
+import { isSeated } from "./activities";
 export class Office {
   scene = new T.Scene();
   robot = new T.Group();
   people = new Map<string, T.Group>();
+  rigs = new Map<
+    string,
+    {
+      hips: T.Group;
+      chest: T.Group;
+      head: T.Group;
+      arms: T.Group[];
+      elbows: T.Group[];
+      legs: T.Group[];
+      knees: T.Group[];
+      book: T.Group;
+      keyboard: T.Group;
+    }
+  >();
+  chairBacks = new Map<number, T.Mesh>();
   obstacles: Obstacle[] = [];
   humans: Human[] = [];
   meshes: T.Mesh[] = [];
@@ -159,7 +175,10 @@ export class Office {
     );
     const cy = y - 0.95;
     this.box([x, cy, 0.48], [0.5, 0.49, 0.12], "teal");
-    this.box([x, cy - 0.22, 0.84], [0.5, 0.085, 0.6], "teal");
+    this.chairBacks.set(
+      id,
+      this.box([x, cy - 0.22, 0.84], [0.5, 0.085, 0.6], "teal"),
+    );
     this.cylinder([x, cy, 0.25], 0.045, 0.45, "steel");
     this.box([x, cy, 0.07], [0.57, 0.1, 0.055], "steel");
     this.box([x, cy, 0.07], [0.1, 0.57, 0.055], "steel");
@@ -170,25 +189,143 @@ export class Office {
     root.position.set(x, y, 0);
     this.scene.add(root);
     this.people.set("person " + id, root);
-    this.humans.push({ id: "person " + id, position: [x, y] });
-    for (const dx of [-0.11, 0.11]) {
-      this.box([dx, -0.06, 0.055], [0.14, 0.28, 0.11], "ink", "room", root);
-      this.box([dx, 0, 0.49], [0.16, 0.19, 0.82], "navy", "clothing", root);
-    }
-    this.sphere([0, 0, 1.13], [0.27, 0.17, 0.36], "shirt", "clothing", root);
-    for (const dx of [-0.3, 0.3]) {
+    this.humans.push({
+      id: "person " + id,
+      position: [x, y],
+      activity: "standing",
+      yaw: 0,
+      activityTime: 0,
+    });
+    const joint = (parent: T.Object3D, name: string, p: number[]) => {
+      const g = new T.Group();
+      g.name = name;
+      g.position.set(p[0], p[1], p[2]);
+      parent.add(g);
+      return g;
+    };
+    const hips = joint(root, "hips", [0, 0, 0.94]),
+      chest = joint(hips, "chest", [0, 0, 0]),
+      head = joint(chest, "head", [0, 0, 0.65]);
+    this.sphere([0, 0, 0.22], [0.25, 0.16, 0.29], "shirt", "clothing", chest);
+    this.cylinder([0, 0, 0.52], 0.065, 0.12, "skin", "skin", chest);
+    this.sphere([0, 0, 0], [0.13, 0.12, 0.17], "skin", "skin", head);
+    this.sphere(
+      [0, -0.015, 0.11],
+      [0.132, 0.12, 0.075],
+      "ink",
+      "clothing",
+      head,
+    );
+    this.sphere([0, 0.12, 0], [0.035, 0.045, 0.04], "skin", "skin", head);
+    const arms: T.Group[] = [],
+      elbows: T.Group[] = [],
+      legs: T.Group[] = [],
+      knees: T.Group[] = [];
+    for (const dx of [-1, 1]) {
+      const arm = joint(chest, "shoulder " + dx, [dx * 0.285, 0, 0.39]);
+      arms.push(arm);
+      this.sphere([0, 0, -0.135], [0.08, 0.09, 0.17], "shirt", "clothing", arm);
+      const elbow = joint(arm, "elbow " + dx, [0, 0, -0.27]);
+      elbows.push(elbow);
       this.sphere(
-        [dx, 0, 1.12],
-        [0.095, 0.11, 0.28],
+        [0, 0, -0.105],
+        [0.06, 0.065, 0.13],
         "shirt",
         "clothing",
-        root,
+        elbow,
       );
-      this.sphere([dx, 0, 0.87], [0.065, 0.075, 0.1], "skin", "skin", root);
+      this.sphere([0, 0, -0.245], [0.065, 0.065, 0.085], "skin", "skin", elbow);
+      const leg = joint(hips, "thigh " + dx, [dx * 0.11, 0, 0]);
+      legs.push(leg);
+      this.box([0, 0, -0.21], [0.16, 0.18, 0.42], "navy", "clothing", leg);
+      const knee = joint(leg, "knee " + dx, [0, 0, -0.42]);
+      knees.push(knee);
+      this.box([0, 0, -0.21], [0.14, 0.16, 0.42], "navy", "clothing", knee);
+      this.box([0, 0.065, -0.465], [0.15, 0.28, 0.11], "ink", "room", knee);
     }
-    this.cylinder([0, 0, 1.47], 0.065, 0.12, "skin", "skin", root);
-    this.sphere([0, 0, 1.64], [0.13, 0.12, 0.17], "skin", "skin", root);
-    this.sphere([0, 0.015, 1.75], [0.132, 0.12, 0.07], "ink", "clothing", root);
+    const book = joint(hips, "book", [0, 0.43, 0.34]);
+    book.rotation.x = 0.25;
+    this.box([0, 0, 0], [0.43, 0.28, 0.035], "orange", "room", book);
+    this.box([0, 0, 0.025], [0.4, 0.25, 0.02], "ceramic", "room", book);
+    this.box([0, 0, 0.039], [0.008, 0.25, 0.003], "steel", "room", book);
+    const keyboard = joint(root, "typing laptop", [0, 0.44, 0.78]);
+    this.box([0, 0, 0], [0.44, 0.28, 0.025], "steel", "laptop", keyboard);
+    this.box([0, -0.01, 0.018], [0.37, 0.16, 0.008], "ink", "laptop", keyboard);
+    this.box(
+      [0, 0.135, 0.13],
+      [0.44, 0.025, 0.25],
+      "screen",
+      "laptop",
+      keyboard,
+    ).rotation.x = -0.12;
+    this.rigs.set("person " + id, {
+      hips,
+      chest,
+      head,
+      arms,
+      elbows,
+      legs,
+      knees,
+      book,
+      keyboard,
+    });
+    book.visible = false;
+    keyboard.visible = false;
+  }
+  poseHuman(h: Human) {
+    const root = this.people.get(h.id),
+      rig = this.rigs.get(h.id);
+    if (!root || !rig) return;
+    const a = h.activity ?? "standing",
+      t = h.activityTime ?? 0,
+      seated = isSeated(a),
+      walk = a === "walking" && h.walking;
+    root.position.set(h.position[0], h.position[1], 0);
+    root.rotation.set(0, 0, h.yaw ?? 0);
+    rig.hips.position.set(0, 0, seated ? 0.57 : 0.94);
+    rig.hips.rotation.set(0, 0, 0);
+    rig.chest.rotation.set(a === "reclining" ? 0.55 : 0, 0, 0);
+    rig.head.rotation.set(
+      a === "reading" ? 0.25 : a === "typing" ? 0.12 : 0,
+      0,
+      0,
+    );
+    rig.book.visible = a === "reading";
+    rig.keyboard.visible = a === "typing";
+    for (let i = 0; i < 2; i++) {
+      const side = i === 0 ? 1 : -1,
+        cycle = Math.sin(t * 5) * side;
+      rig.legs[i].rotation.set(
+        seated ? Math.PI / 2 : walk ? 0.45 * cycle : 0,
+        0,
+        0,
+      );
+      rig.knees[i].rotation.set(
+        seated ? -Math.PI / 2 : walk ? -0.25 * Math.max(0, -cycle) : 0,
+        0,
+        0,
+      );
+      let shoulder = seated ? 0.35 : 0,
+        elbow = seated ? 0.55 : 0;
+      if (a === "reading") {
+        shoulder = 1.05;
+        elbow = 0.9;
+      }
+      if (a === "typing") {
+        shoulder = 0.9 + 0.035 * Math.sin(t * 9 + i * Math.PI);
+        elbow = 0.65 + 0.065 * Math.sin(t * 9 + i * Math.PI);
+      }
+      if (a === "reclining") {
+        shoulder = 0.55;
+        elbow = 0.65;
+      }
+      if (walk) {
+        shoulder = -0.3 * cycle;
+        elbow = 0.15;
+      }
+      rig.arms[i].rotation.set(shoulder, 0, 0);
+      rig.elbows[i].rotation.set(elbow, 0, 0);
+    }
   }
   buildRobot() {
     const r = this.robot;
@@ -283,8 +420,13 @@ export class Office {
   sync(p: Pose, humans: Human[]) {
     this.robot.position.set(p[0], p[1], 0);
     this.robot.rotation.z = p[2];
-    for (const h of humans)
-      this.people.get(h.id)?.position.set(h.position[0], h.position[1], 0);
+    for (const [id, back] of this.chairBacks) {
+      const reclining = humans[id - 1]?.activity === "reclining";
+      back.position.y = 1.1 - (reclining ? 0.34 : 0.22);
+      back.position.z = reclining ? 0.79 : 0.84;
+      back.rotation.x = reclining ? 0.55 : 0;
+    }
+    for (const h of humans) this.poseHuman(h);
     this.scene.updateMatrixWorld(true);
   }
   resetPeople() {
