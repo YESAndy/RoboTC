@@ -40,3 +40,12 @@ The recorded benchmark predates a dependency patch update, optional browser-agen
 ## Reproduce
 
 Run `npm test` and `npm run build`. Start `npm run preview`, then open `/?test=1` for GPU checks or `/?test=1&benchmark=600` for the standard ten-minute tour followed by a one-minute low-power run. Keep the browser tab visible and the driving area focused. The benchmark report is downloadable from the page when complete.
+
+## Research page update — 2026-10-01
+
+- Production build and all 19 existing unit tests pass.
+- All 15 browser GPU/scene checks pass in Chromium 154; no console errors observed.
+- Desktop and 390 px narrow layouts checked; no page-wide horizontal overflow. Section links work, one H1 is present, and tables expose row/column headings.
+- Approach continued through multiple visits; Reset cleared visits and hid the speech bubble. The brief arrival bubble was not captured during this smoke check.
+- All supplied reference activity rows and detection metrics were transcribed. The page explicitly notes the poster's 13-category total versus the reference table's 14 rows.
+- Research content is inserted before WebGL initialization and remains independent of simulator startup. No new dependencies or simulation API changes.

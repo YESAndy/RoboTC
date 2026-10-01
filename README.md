@@ -77,3 +77,7 @@ Open `/?test=1` on the preview server to run GPU sensor and scene checks. Open `
 Create the public repository `YESAndy/RoboTC` and push this folder's contents to its `master` branch. In **Settings → Pages → Build and deployment**, select **GitHub Actions**. The included workflow runs tests and a production build, then deploys static files. Assets use relative URLs so the site works under `/RoboTC/`. Pull requests run validation without deployment.
 
 No Blender files, reference photos, local snapshots, account credentials, or original project sources belong in the public repository. See `THIRD_PARTY_NOTICES.md` for dependencies.
+
+## Research introduction
+
+The page includes the RoboTC poster introduction, hardware, collection pipeline, dataset activity table, detection results, and approach results. Static content lives in `src/research.ts`; the supplied hardware image is in `public/research/`. Reported research results are distinguished from the oracle-based browser demo. The poster reports 13 activity categories while the supplied reference table has 14 rows; the page preserves both and notes the discrepancy.
