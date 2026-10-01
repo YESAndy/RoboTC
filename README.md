@@ -20,7 +20,7 @@ Open the local address printed by Vite. No Blender, server backend, account, cam
 - **Start:** start manual driving. Click the office to focus the driving area.
 - **W/S:** forward/back. **A/D:** strafe. **Q/E:** turn. **Space:** stop.
 - **Pause:** stop. Leaving the driving area, switching windows, or hiding the tab also pauses and releases all keys.
-- **Approach people:** visit the nearest reachable unvisited person, stop approximately one meter away, face them, dwell two seconds, then visit the next person. Repeat after everyone has been visited.
+- **Approach people:** visit the nearest reachable unvisited person, stop approximately one meter away, face them, dwell two seconds, then visit the next person. Repeat after everyone has been visited. On arrival, a speech bubble asks “How do you feel about the temperature?” during the two-second visit; it disappears when the next approach begins.
 - **Reset:** restore the robot, randomly assign each person an activity and its starting position, clear time, path, and visit history, and pause.
 - **Save snapshot:** download a ZIP of synchronized observations and metadata.
 - Drag the office to orbit; scroll to zoom. The colored overview is a visualization, not an RGB sensor.

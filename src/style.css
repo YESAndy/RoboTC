@@ -555,3 +555,48 @@ footer i {
   color: #526e64;
   line-height: 1.8;
 }
+
+/* A lightweight speech card, anchored above the robot in the overview. */
+.comfort-bubble {
+  position: absolute;
+  z-index: 4;
+  width: 252px;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
+  padding: 15px 18px 16px;
+  border: 1px solid rgba(67, 94, 81, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 254, 250, 0.97);
+  color: #28473d;
+  box-shadow: 0 8px 28px rgba(28, 54, 43, 0.14);
+  transform: translate(-50%, calc(-100% - 14px));
+  pointer-events: none;
+}
+.comfort-bubble[hidden] { display: none; }
+.comfort-bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -6px;
+  left: calc(50% - 6px);
+  width: 11px;
+  height: 11px;
+  background: #fffefa;
+  border-right: 1px solid rgba(67, 94, 81, 0.16);
+  border-bottom: 1px solid rgba(67, 94, 81, 0.16);
+  transform: rotate(45deg);
+}
+.comfort-speaker {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #788b80;
+}
+.comfort-bubble p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+}

@@ -12,8 +12,8 @@ const $ = <E extends HTMLElement = HTMLElement>(id: string) =>
   document.getElementById(id) as E;
 $("app").innerHTML =
   `<header><a class="brand" href="./"><span class="brand-icon">R</span>RoboTC<span class="version">OFFICE SIMULATOR</span></a><div class="session"><span class="dot"></span> LOCAL SIMULATION <span class="divider">/</span> <span id="clock">00:00.0</span></div></header>
-<main><div class="heading"><div><div class="eyebrow">HUMAN-AWARE NAVIGATION</div><h1>A room to explore.</h1></div><div class="preset"><label for="preset">POWER MODE</label><select id="preset"><option value="standard">Standard · 5 Hz</option><option value="low_power">Low power · 2 Hz</option></select></div></div>
-<div class="workspace"><section class="overview panel"><div class="panel-heading"><h2><span class="marker"></span>Office overview</h2><span>8 × 6 m</span></div><div id="viewport" tabindex="0" aria-label="Robot driving area. W S forward back, A D sideways, Q E rotate, Space stop."><div id="loading">Preparing the office…</div><div class="view-label">LIVE ENVIRONMENT <span>Drag to orbit · Scroll to zoom</span></div><div class="pose" id="pose">x −2.80 · y −1.60 · yaw 0°</div></div><div class="toolbar"><div><button id="start">▶ Start</button><button id="pause">Ⅱ Pause</button><button id="reset">↺ Reset</button></div><button id="approach" class="primary">Approach people <span>↗</span></button></div></section>
+<main><div class="heading"><div><div class="eyebrow">HUMAN-AWARE NAVIGATION</div><h1>active thermal comfort data collection demo</h1></div><div class="preset"><label for="preset">POWER MODE</label><select id="preset"><option value="standard">Standard · 5 Hz</option><option value="low_power">Low power · 2 Hz</option></select></div></div>
+<div class="workspace"><section class="overview panel"><div class="panel-heading"><h2><span class="marker"></span>Office overview</h2><span>8 × 6 m</span></div><div id="viewport" tabindex="0" aria-label="Robot driving area. W S forward back, A D sideways, Q E rotate, Space stop."><div id="loading">Preparing the office…</div><div id="comfort-bubble" class="comfort-bubble" role="status" aria-live="polite" hidden><span class="comfort-speaker">RoboTC</span><p>How do you feel about the temperature?</p></div><div class="view-label">LIVE ENVIRONMENT <span>Drag to orbit · Scroll to zoom</span></div><div class="pose" id="pose">x −2.80 · y −1.60 · yaw 0°</div></div><div class="toolbar"><div><button id="start">▶ Start</button><button id="pause">Ⅱ Pause</button><button id="reset">↺ Reset</button></div><button id="approach" class="primary">Approach people <span>↗</span></button></div></section>
 <aside class="sensors"><section class="panel sensor"><div class="panel-heading"><h2><span class="marker depth"></span>Depth</h2><span id="depth-size">320 × 240</span></div><div class="sensor-image"><canvas id="depth" aria-label="Depth observation"></canvas><span class="sensor-badge">METERS</span></div><div class="scale depth-scale"></div><div class="scale-label"><span>0.2 m</span><span>10 m</span></div></section><section class="panel sensor"><div class="panel-heading"><h2><span class="marker thermal"></span>Thermal</h2><span id="thermal-size">160 × 120</span></div><div class="sensor-image"><canvas id="thermal" aria-label="Thermal observation"></canvas><span class="sensor-badge">CELSIUS</span></div><div class="scale thermal-scale"></div><div class="scale-label"><span>18°C</span><span>60°C</span></div></section></aside></div>
 <div class="bottom"><section class="mission panel"><div><span class="eyebrow">CURRENT TASK</span><h3 id="status" role="status">Ready to explore</h3><p id="detail">Drive the cart, or let it approach each person in turn.</p></div><div class="metrics"><div><span>TARGET</span><strong id="target">—</strong></div><div><span>VISITS</span><strong id="visits">0</strong></div><div><span>SENSOR RATE</span><strong id="rate">—</strong></div></div><button id="snapshot" class="snapshot">↓ Save snapshot</button></section><section class="keys"><span class="eyebrow">MANUAL CONTROLS</span><div><kbd>W</kbd><kbd>S</kbd> Drive <kbd>A</kbd><kbd>D</kbd> Strafe <kbd>Q</kbd><kbd>E</kbd> Turn <kbd>Space</kbd> Stop</div><p>Click the office to drive. Leaving the driving area pauses motion.</p></section></div><div id="activities" class="activity-list" aria-label="Human activities"></div><footer><span><i></i> Oracle human detection · Ideal depth · Assigned surface temperatures</span><span>Runs on your device. Snapshots download only when requested.</span></footer><div id="error" role="alert" hidden></div></main>`;
 async function boot() {
@@ -126,7 +126,28 @@ async function boot() {
   function focus() {
     viewport.focus({ preventScroll: true });
   }
+  const comfortBubble = $("comfort-bubble");
+  const bubbleAnchor = new T.Vector3();
+  function updateComfortBubble() {
+    const visible = sim.tour.enabled && sim.tour.status === "DWELLING";
+    comfortBubble.hidden = !visible;
+    if (!visible) return;
+    // Project the robot's mast into the overview; this DOM overlay never enters sensors.
+    camera.updateMatrixWorld();
+    bubbleAnchor.set(sim.pose[0], sim.pose[1], config.robot.height_m + 0.15).project(camera);
+    if (bubbleAnchor.z < -1 || bubbleAnchor.z > 1) {
+      comfortBubble.hidden = true;
+      return;
+    }
+    const width = viewport.clientWidth, height = viewport.clientHeight;
+    const half = comfortBubble.offsetWidth / 2 + 12;
+    const x = Math.max(half, Math.min(width - half, (bubbleAnchor.x + 1) * width / 2));
+    const y = Math.max(comfortBubble.offsetHeight + 24, Math.min(height - 36, (1 - bubbleAnchor.y) * height / 2));
+    comfortBubble.style.left = `${x}px`;
+    comfortBubble.style.top = `${y}px`;
+  }
   function updateUI() {
+    updateComfortBubble();
     const state = sim.tour.status,
       paused = !sim.running;
     let status = paused
@@ -289,6 +310,7 @@ async function boot() {
             (Math.floor((now - nextCapture) / period) + 1) * period
           : now + period;
       }
+      updateComfortBubble();
       renderer.render(office.scene, camera);
       if (now > uiNext) {
         updateUI();
