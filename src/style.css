@@ -1040,3 +1040,7 @@ a:focus-visible,
     gap: 14px;
   }
 }
+
+.website-views { display: inline-flex; align-items: center; min-height: 20px; flex-shrink: 0; }
+.website-views img { display: block; height: 20px; width: auto; }
+footer { flex-wrap: wrap; gap: 12px 24px; }

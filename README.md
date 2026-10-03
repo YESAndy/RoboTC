@@ -81,3 +81,9 @@ No Blender files, reference photos, local snapshots, account credentials, or ori
 ## Research introduction
 
 The page includes the RoboTC poster introduction, hardware, collection pipeline, dataset activity table, detection results, and approach results. Static content lives in `src/research.ts`; the supplied hardware image is in `public/research/`. Reported research results are distinguished from the oracle-based browser demo. The poster reports 13 activity categories while the supplied reference table has 14 rows; the page preserves both and notes the discrepancy.
+
+## Website view counter
+
+The footer uses a shared [Hits.sh](https://github.com/silentsoft/hits) badge to count page loads on `yesandy.github.io/RoboTC/`. Counting begins after deployment; historical visits cannot be recovered, and this is not a unique-person count. Local previews and test/benchmark pages never request the badge. Simulator resets and section navigation do not add a view.
+
+The published page makes one external image request to Hits.sh, which receives ordinary connection information such as visitor IP addresses. The request suppresses the referrer and sends no simulation observations or snapshots. Counts depend on the service, caching, and content blockers. Loading failures show an unavailable message. See the [service privacy policy](https://hits.sh/privacy/).
